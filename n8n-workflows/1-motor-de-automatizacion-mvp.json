@@ -1,0 +1,2170 @@
+{
+  "id": "3ewBVnadQN5UDnXc",
+  "name": "Flujo 1 .4 (Repor. Retroalim.)(Abre Carpeta\"Calificaciones de IDoceo\" en Drive,\")(Genera XLSX de Calif. en Drive para IDoceo)",
+  "active": false,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "url": "https://classroom.googleapis.com/v1/courses",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "oAuth2Api",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "courseStates",
+              "value": "ACTIVE"
+            },
+            {
+              "name": "fields",
+              "value": "courses(id,name,section,courseState,teacherFolder),nextPageToken"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -1968,
+        -368
+      ],
+      "id": "2fbc8c81-d0c2-4ee9-ac2d-c939305bf1c3",
+      "name": "1. Listar Cursos Classroom",
+      "credentials": {
+        "oAuth2Api": {
+          "id": "At738xxBdue4mssb",
+          "name": "Google Classroom - Cuenta Principal"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "=https://classroom.googleapis.com/v1/courses/{{$json.courseId}}/courseWork",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "oAuth2Api",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "pageSize",
+              "value": "100"
+            },
+            {
+              "name": "courseWorkStates",
+              "value": "PUBLISHED"
+            },
+            {
+              "name": "fields",
+              "value": "courseWork(courseId,id,title,description,state,maxPoints,dueDate,dueTime,materials,alternateLink,creationTime,updateTime),nextPageToken"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -656,
+        656
+      ],
+      "id": "62aad401-48a9-4b0f-8928-1342fc246812",
+      "name": "3. Listar Tareas Classroom",
+      "credentials": {
+        "oAuth2Api": {
+          "id": "At738xxBdue4mssb",
+          "name": "Google Classroom - Cuenta Principal"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const taskResponses = $input.all();\nconst courses = $('2. Separar Cursos').all();\nconst courseMap = new Map(\n  courses.map(item => [String(item.json.courseId), item.json])\n);\n\nconst output = [];\n\nfor (const response of taskResponses) {\n  for (const task of response.json.courseWork ?? []) {\n    const course = courseMap.get(String(task.courseId));\n\n    output.push({\n      json: {\n        platform: 'google_classroom',\n        courseId: task.courseId,\n        courseName: course?.courseName ?? '',\n        courseSection: course?.courseSection ?? '',\n        teacherFolderId: course?.teacherFolderId ?? null,\n        teacherFolderName: course?.teacherFolderName ?? null,\n\n        assignmentId: task.id,\n        assignmentTitle: task.title,\n        assignmentDescription: task.description ?? '',\n        assignmentState: task.state,\n        assignmentType: task.workType,\n        maxPoints: task.maxPoints ?? null,\n        creationTime: task.creationTime ?? null,\n        updateTime: task.updateTime ?? null,\n        dueDate: task.dueDate ?? null,\n        dueTime: task.dueTime ?? null,\n        assignmentAlternateLink: task.alternateLink ?? null,\n        rawAssignment: task,\n      },\n    });\n  }\n}\n\nreturn output;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -432,
+        480
+      ],
+      "id": "8860e553-a386-4437-8a6a-59e0caa93847",
+      "name": "4. Separar Tareas + Añadir Curso"
+    },
+    {
+      "parameters": {
+        "url": "=https://classroom.googleapis.com/v1/courses/{{$json.courseId}}/courseWork/{{$json.assignmentId}}/studentSubmissions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "oAuth2Api",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "fields",
+              "value": "studentSubmissions(courseId,courseWorkId,id,userId,creationTime,updateTime,state,alternateLink,courseWorkType,assignmentSubmission),nextPageToken"
+            },
+            {
+              "name": "states",
+              "value": "TURNED_IN"
+            },
+            {
+              "name": "pageSize",
+              "value": "100"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -192,
+        384
+      ],
+      "id": "bc7d423c-bc4d-420d-a982-81b2d054e7cc",
+      "name": "5. Obtener Entregas Classroom",
+      "credentials": {
+        "oAuth2Api": {
+          "id": "At738xxBdue4mssb",
+          "name": "Google Classroom - Cuenta Principal"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const resultado = [];\n\nfor (const item of $input.all()) {\n  const entregas = item.json.studentSubmissions ?? [];\n\n  for (const entrega of entregas) {\n    if (entrega.state !== 'TURNED_IN') continue;\n\n    const attachments = entrega.assignmentSubmission?.attachments ?? [];\n\n    resultado.push({\n      json: {\n        platform: 'google_classroom',\n        courseId: entrega.courseId,\n        assignmentId: entrega.courseWorkId,\n        submissionId: entrega.id,\n        studentId: entrega.userId,\n        submissionCreatedAt: entrega.creationTime ?? null,\n        submissionUpdatedAt: entrega.updateTime ?? null,\n        submissionState: entrega.state,\n        attachments,\n        hasAttachments: attachments.length > 0,\n        rawSubmission: entrega,\n      },\n    });\n  }\n}\n\nreturn resultado;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -48,
+        272
+      ],
+      "id": "a7755798-5e50-4538-a237-2ab0c9b33c6b",
+      "name": "6. Separar Entregas"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "advanced": true,
+        "mergeByFields": {
+          "values": [
+            {
+              "field1": "assignmentId",
+              "field2": "assignmentId"
+            },
+            {
+              "field1": "courseId",
+              "field2": "courseId"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        -16,
+        576
+      ],
+      "id": "ba80b801-1ba3-4b42-8840-874a95585591",
+      "name": "7. Unir Curso + Tarea + Entrega"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const entrega = $json;\n\nconst archivo = entrega.attachments?.[0]?.driveFile ?? {};\n\nreturn {\n  json: {\n    ...entrega,\n\n    evaluationKey: `${entrega.courseId}_${entrega.assignmentId}_${entrega.studentId}`,\n\n    fileId: archivo.id ?? '',\n    fileName: archivo.title ?? '',\n    fileLink: archivo.alternateLink ?? '',\n    fileThumbnailUrl: archivo.thumbnailUrl ?? '',\n\n    hasFile: !!archivo.id,\n    fileSource: 'google_drive',\n  },\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -48,
+        880
+      ],
+      "id": "2b45d35d-c361-4ca7-9ecb-e4f5fa7e32ad",
+      "name": "8. Preparar Evaluación IA"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "80df87b6-06b6-4de0-bf7e-f2a54b1e8430",
+              "leftValue": "={{$json.hasFile}}",
+              "rightValue": "true",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            },
+            {
+              "id": "4bdcf877-d18b-4893-96e7-8a1c9b35cc53",
+              "leftValue": "={{$json.fileName.toLowerCase()}}",
+              "rightValue": ".pdf",
+              "operator": {
+                "type": "string",
+                "operation": "contains"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        144,
+        1056
+      ],
+      "id": "35d9f77c-4bfc-403f-bdc5-b7faae916412",
+      "name": "9. If, Es PDF?"
+    },
+    {
+      "parameters": {
+        "operation": "download",
+        "fileId": {
+          "__rl": true,
+          "value": "={{$json.fileId}}",
+          "mode": "id"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        240,
+        544
+      ],
+      "id": "3bedfd90-6193-4170-95d7-ca46e88b3b65",
+      "name": "10. Descargar Archivo Entregado",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "9lVIWtbd9ZUWkRNN",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "2a77f23d-a5e3-4a7c-9be2-944a99a2d59c",
+              "leftValue": "={{$binary.data.mimeType}}",
+              "rightValue": "pdf",
+              "operator": {
+                "type": "string",
+                "operation": "contains"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        336,
+        320
+      ],
+      "id": "e27e7042-a676-4441-83dc-2a4983b32bef",
+      "name": "11. Detectar Tipo de Archivo"
+    },
+    {
+      "parameters": {
+        "operation": "pdf",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1.1,
+      "position": [
+        416,
+        560
+      ],
+      "id": "f23ce528-a81b-4719-9d3a-719c2b725a8c",
+      "name": "12. Extraer Texto PDF"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "f0ff65a3-5b74-46f4-beee-61800cbc466c",
+              "leftValue": "={{ $json.text && $json.text.trim().length > 30 }}",
+              "rightValue": "true",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        416,
+        784
+      ],
+      "id": "80a1d9fb-e8d2-4638-8c7e-90f7dd6f2b02",
+      "name": "13. If ¿Texto Suficiente?"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const meta = $('8. Preparar Evaluación IA').item.json;\n\nreturn {\n  json: {\n    claveEntrega: meta.claveEntrega,\n    textoTrabajo: $json.text ?? '',\n    tareaNombre: meta.tareaNombre,\n    tareaDescripcion: meta.tareaDescripcion,\n    tareaMaxPoints: meta.tareaMaxPoints,\n    estudianteId: meta.estudianteId,\n    cursoId: meta.cursoId,\n    archivoNombre: meta.archivoNombre,\n    submissionId: meta.submissionId,\nstudentId: meta.studentId,\ncourseId: meta.courseId,\nassignmentId: meta.assignmentId,\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        864,
+        656
+      ],
+      "id": "4eab2aee-a28a-4221-9f58-8a2a8b62771b",
+      "name": "14. Preparar Texto PDF"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "advanced": true,
+        "mergeByFields": {
+          "values": [
+            {
+              "field1": "submissionId",
+              "field2": "submissionId"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        896,
+        1168
+      ],
+      "id": "b7718610-b849-420e-919a-48e0705800c2",
+      "name": "15. Unir Texto + Datos"
+    },
+    {
+      "parameters": {
+        "url": "=https://classroom.googleapis.com/v1/userProfiles/{{$json.studentId}}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "oAuth2Api",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        960,
+        1424
+      ],
+      "id": "64a91be1-abc6-4edc-ab76-93922f9627e5",
+      "name": "16. Obtener Nombre del Estudiante",
+      "credentials": {
+        "oAuth2Api": {
+          "id": "At738xxBdue4mssb",
+          "name": "Google Classroom - Cuenta Principal"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const original = $('15. Unir Texto + Datos').item.json;\n\nreturn {\n  json: {\n    ...original,\n    estudianteNombre: $json.name?.fullName || '',\n    estudianteNombreObjeto: $json.name || null,\n    classroomProfileId: $json.id,\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1072,
+        528
+      ],
+      "id": "900b9443-11f4-4af6-9df6-cf68f5ab28d8",
+      "name": "17. Preparar Nombre Estudiante"
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "gpt-4.1-mini",
+          "mode": "list",
+          "cachedResultName": "GPT-4.1-MINI"
+        },
+        "responses": {
+          "values": [
+            {
+              "content": "=Actúa como un docente evaluador experto.\n\nTu tarea es evaluar el trabajo entregado por un estudiante utilizando:\n\n* Nombre de la tarea\n* Descripción de la tarea\n* Trabajo realizado por el estudiante\n\nPRIMER PASO: IDENTIFICAR EL TIPO DE TAREA\n\nAnaliza cuidadosamente el nombre y la descripción de la tarea.\n\nClasifica únicamente como uno de estos valores:\n\n* matemática\n* música\n* lenguaje\n* ciencias\n* historia\n* arte\n* tecnología\n* otro\n\nEjemplos:\n\nSi aparecen palabras como:\ninstrumento, canto, coral, escala, arpegio, ritmo, melodía, armonía, interpretación, violín, piano, guitarra, música\n\nENTONCES:\n“tipo_tarea”: “música”\n\nSi aparecen palabras como:\necuación, álgebra, geometría, función, fracción, porcentaje, matemática\n\nENTONCES:\n“tipo_tarea”: “matemática”\n\nSEGUNDO PASO: EVALUAR\n\nEvalúa exclusivamente según el tipo de tarea identificado.\n\nNo inventes información.\n\nNo menciones criterios que no aparecen en el trabajo.\n\nTERCER PASO: CALIFICAR\n\nIMPORTANTE:\nLa calificación del trabajo entregado debe calcularse sobre un máximo de 60 puntos, no sobre 100.\n\nIMPORTANTE:\nNo penalices al estudiante ni menciones como error que la tarea esté configurada sobre 100 puntos en Google Classroom.\n\nLa escala de Google Classroom puede ser 100, pero para esta etapa solo debes evaluar el trabajo entregado sobre 60 puntos.\n\nLa evaluación de este nodo corresponde únicamente al 60% de la calificación final.\n\nNo incluyas en \"aspectosMejorar\" comentarios sobre diferencia entre 100 puntos y 60 puntos.\n\nLa calificación del trabajo entregado debe calcularse sobre un máximo de 60 puntos. Esto es una regla interna del sistema, no un criterio para evaluar al estudiante.\n\nRúbrica seleccionada:\n{{$json.rubricaSeleccionada}}\n\nEvalúa el trabajo usando únicamente esa rúbrica.\nLa nota del trabajo debe ser sobre 60 puntos.\n\nResponde únicamente en JSON válido con esta estructura:\n\n{\n  \"notaTrabajoSobre60\": 0,\n  \"fortalezas\": \"\",\n  \"aspectosMejorar\": \"\",\n  \"retroalimentacion\": \"\",\n  \"temaDetectado\": \"\",\n  \"nivelComprensionEsperado\": \"\"\n}\n\nReglas:\n- notaTrabajoSobre60 debe ser un número entre 0 y 60.\n- fortalezas debe resumir los puntos positivos del trabajo.\n- aspectosMejorar debe indicar debilidades o errores.\n- retroalimentacion debe ser breve, clara y útil para el estudiante.\n- temaDetectado debe indicar el tema principal del trabajo.\n- nivelComprensionEsperado debe ser: bajo, medio o alto.\n- No escribas texto fuera del JSON.\n\nCUARTO PASO: GENERAR RETROALIMENTACIÓN\n\nGenera:\n\n* fortalezas\n* aspectos_mejorar\n* retroalimentacion\n\nLas fortalezas y aspectos_mejorar deben ser listas.\n\nIMPORTANTE\n\nDevuelve ÚNICAMENTE JSON válido.\n\nNO escribas explicaciones.\n\nNO uses markdown.\n\nNO coloques texto antes ni después del JSON.\n\nLa estructura debe ser EXACTAMENTE:\n\n{\n“tipo_tarea”: “”,\n“calificacion”: 0,\n“fortalezas”: [\n“”\n],\n“aspectos_mejorar”: [\n“”\n],\n“retroalimentacion”: “”\n}\n\nDATOS DE LA TAREA\n\nNombre de la tarea:\n{{ $json.tareaNombre }}\n\nDescripción de la tarea:\n{{ $json.tareaDescripcion }}\n\nNombre del estudiante:\n{{ $json.name.fullName }}\n\nTrabajo del estudiante:\n{{ $json.textoTrabajo }}"
+            }
+          ]
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 2.3,
+      "position": [
+        1200,
+        1584
+      ],
+      "id": "48a99e52-8246-4ee4-b459-14b364d9aba7",
+      "name": "18. Evaluar Trabajo con IA",
+      "credentials": {
+        "openAiApi": {
+          "id": "zceXPlYBszVQRMmY",
+          "name": "OpenAI account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const texto = $json.output[0].content[0].text;\n\nconst limpio = texto\n  .replace(/```json/g, \"\")\n  .replace(/```/g, \"\")\n  .trim();\n\ntry {\n  const resultado = JSON.parse(limpio);\n\n  return {\n    json: {\n      ...$json,\n      tipo_tarea: resultado.tipo_tarea,\n      calificacion: resultado.calificacion,\n      fortalezas: resultado.fortalezas,\n      aspectos_mejorar: resultado.aspectos_mejorar,\n      retroalimentacion: resultado.retroalimentacion,\n      errorProcesandoIA: false,\n    }\n  };\n} catch (error) {\n  return {\n    json: {\n      ...$json,\n      errorProcesandoIA: true,\n      rawRespuestaIA: texto,\n      mensajeError: error.message,\n    }\n  };\n}"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1424,
+        944
+      ],
+      "id": "69e37285-458c-4530-a7df-ae80338c12e4",
+      "name": "19. Procesar Resultado IA"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        1520,
+        592
+      ],
+      "id": "790c6df8-33d7-4348-b6b3-fe9b57120b99",
+      "name": "20. Merge"
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\n\nconst limpiarNombreArchivo = (texto) =>\n  String(texto || \"Reporte iDoceo\")\n    .replace(/[\\\\/:*?\"<>|]/g, \"\")\n    .replace(/\\s+/g, \" \")\n    .trim();\n\nconst grupos = {};\n\nfor (const item of items) {\n  const data = item.json;\n\n  const assignmentId =\n    data.assignmentId ||\n    data.nombreArchivo ||\n    data.assignmentTitle ||\n    \"sin_tarea\";\n\n  const nombreArchivo = limpiarNombreArchivo(\n    data.assignmentTitle ||\n    data.nombreArchivo ||\n    data.tareaNombre ||\n    \"Reporte iDoceo\"\n  );\n\n  const teacherFolderId =\n    data.teacherFolderId ||\n    data.courseFolderId ||\n    data.teacherFolder?.id ||\n    data.carpetaCursoId ||\n    data[\"Carpeta del profesor\"]?.identificación ||\n    data[\"Carpeta del profesor\"]?.id ||\n    \"\";\n\n  const teacherFolderName =\n    data.teacherFolderName ||\n    data.courseFolderName ||\n    data.teacherFolder?.title ||\n    data.teacherFolder?.name ||\n    data[\"Carpeta del profesor\"]?.título ||\n    data[\"Carpeta del profesor\"]?.title ||\n    data[\"Carpeta del profesor\"]?.name ||\n    \"\";\n\n  if (!grupos[assignmentId]) {\n    grupos[assignmentId] = {\n      nombreArchivo,\n      teacherFolderId,\n      teacherFolderName,\n      filas: [],\n    };\n  }\n\n  grupos[assignmentId].filas.push({\n    Estudiante:\n      data.estudianteNombre ||\n      data.name?.fullName ||\n      data.studentName ||\n      data.studentId ||\n      \"\",\n    Calificación: data.calificacion ?? \"\",\n  });\n}\n\nreturn Object.values(grupos).map((grupo) => ({\n  json: {\n    nombreArchivo: grupo.nombreArchivo,\n    teacherFolderId: grupo.teacherFolderId,\n    teacherFolderName: grupo.teacherFolderName,\n    filas: grupo.filas,\n  },\n}));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1600,
+        896
+      ],
+      "id": "b6deffde-903a-43c7-89fd-2c69d041809f",
+      "name": "21. Agrupar Reporte iDoceo por Tarea"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        1616,
+        1136
+      ],
+      "id": "f1b8ae90-2fb7-4faa-aa99-139db88f09f7",
+      "name": "22. Loop Over Items"
+    },
+    {
+      "parameters": {
+        "jsCode": "const grupo = $input.first().json;\n\nconst nombreTarea = (grupo.nombreArchivo || 'Calificación')\n  .replace(/\\.xlsx$/i, '')\n  .trim();\n\nreturn grupo.filas.map(fila => ({\n  json: {\n    Estudiante: fila.Estudiante,\n    [nombreTarea]: fila.Calificación,\n  },\n}));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1632,
+        1376
+      ],
+      "id": "825a32c3-acd9-4060-82e5-817d56158f57",
+      "name": "23. Preparar XLSX iDoceo"
+    },
+    {
+      "parameters": {
+        "operation": "xlsx",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.convertToFile",
+      "typeVersion": 1.1,
+      "position": [
+        2512,
+        1328
+      ],
+      "id": "9426e86b-87f7-47ce-9ada-704438c9d0f6",
+      "name": "24. Convertir a XLSX"
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.first();\n\nconst nombreBase =\n  $('21. Agrupar Reporte iDoceo por Tarea').first().json.nombreArchivo ||\n  'Reporte iDoceo';\n\nconst nombreLimpio = nombreBase\n  .replace(/\\.xlsx$/i, '')\n  .replace(/[\\\\/:*?\"<>|]/g, '-')\n  .trim();\n\nreturn [\n  {\n    json: {\n      ...item.json,\n      fileName: `${nombreLimpio}.xlsx`,\n    },\n    binary: {\n      data: {\n        ...item.binary.data,\n        fileName: `${nombreLimpio}.xlsx`,\n        fileExtension: 'xlsx',\n        mimeType:\n          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',\n      },\n    },\n  },\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2720,
+        1104
+      ],
+      "id": "0e9dbe0a-fc19-4e2a-b8ec-c519fe88360f",
+      "name": "25. Renombrar XLSX iDoceo."
+    },
+    {
+      "parameters": {
+        "resource": "fileFolder",
+        "queryString": "Calificaciones para IDoceo",
+        "limit": 10,
+        "filter": {
+          "folderId": {
+            "__rl": true,
+            "value": "={{ $('7. Unir Curso + Tarea + Entrega').first().json.teacherFolderId }}",
+            "mode": "id"
+          }
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        2944,
+        992
+      ],
+      "id": "251a731b-8410-4195-98f4-576a127d013d",
+      "name": "26. Search files and folders",
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "9lVIWtbd9ZUWkRNN",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "folder",
+        "name": "Calificaciones para IDoceo",
+        "driveId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "My Drive"
+        },
+        "folderId": {
+          "__rl": true,
+          "value": "={{ $('7. Unir Curso + Tarea + Entrega').first().json.teacherFolderId }}",
+          "mode": "id"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        3136,
+        1408
+      ],
+      "id": "f314f955-f954-498f-a855-acfff788038a",
+      "name": "28. Create folder: Calificaciones para IDoceo",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "9lVIWtbd9ZUWkRNN",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const binarySource = $('25. Renombrar XLSX iDoceo.').first().binary;\n\nreturn [\n  {\n    json: {\n      folderId: $json.id,\n      folderName: $json.name,\n    },\n    binary: binarySource,\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3232,
+        1120
+      ],
+      "id": "bb8c144c-ade4-4fcc-873b-fab802a38bc5",
+      "name": "29. Mantiene el Binario"
+    },
+    {
+      "parameters": {
+        "name": "={{ $binary.data.fileName }}",
+        "driveId": {
+          "__rl": true,
+          "value": "={{ $json.folderId }}",
+          "mode": "id"
+        },
+        "folderId": {
+          "__rl": true,
+          "value": "={{ $json.folderId }}",
+          "mode": "id"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        3360,
+        928
+      ],
+      "id": "18e5d875-a6b8-4344-b63b-a5a800db4a9e",
+      "name": "30. Subir XLSX iDoceo a Drive",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "9lVIWtbd9ZUWkRNN",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "908769c2-8a61-4034-a20d-60fbff3b42e6",
+              "leftValue": "={{ $json.id || '' }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        2976,
+        1312
+      ],
+      "id": "4d791335-a1b7-456e-88ee-26be57daadde",
+      "name": "27.If, ¿Carpeta Calificaciones de iDoceo Existe?"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const data = $json;\n\nconst estudianteNombre =\n  data.estudianteNombre ||\n  data.studentName ||\n  data.nombreEstudiante ||\n  data.nombre_completo ||\n  data.fullName ||\n  'Estudiante no identificado';\n\nconst docenteNombre =\n  data.docenteNombre ||\n  data.teacherName ||\n  data.nombreDocente ||\n  data.profesor ||\n  'Docente no identificado';\n\nconst tarea =\n  data.tarea ||\n  data.assignmentTitle ||\n  data.assignmentName ||\n  data.title ||\n  'Tarea sin nombre';\n\nconst curso =\n  data.curso ||\n  data.courseName ||\n  data.courseTitle ||\n  data.courseId ||\n  '';\n\nconst materia =\n  data.materia ||\n  data.subject ||\n  data.asignatura ||\n  '';\n\nconst institucionNombre =\n  data.institucionNombre ||\n  data.schoolName ||\n  data.institucion ||\n  '';\n\nconst calificacion =\n  data.calificacionFinal ||\n  data.calificacion ||\n  data.grade ||\n  data.score ||\n  '';\n\nconst output = {\n  ...data,\n\n  estudianteNombre,\n  docenteNombre,\n  tarea,\n  curso,\n  materia,\n  institucionNombre,\n  calificacion,\n\n  fortalezas:\n    data.fortalezas ||\n    data.fortaleza ||\n    data.puntosFuertes ||\n    'No se identificaron fortalezas especificas.',\n\n  aspectosMejorar:\n    data.aspectosMejorar ||\n    data.aspectosAMejorar ||\n    data['Aspectos a Mejorar'] ||\n    data['Aspectos a mejorar'] ||\n    data.aspectos_a_mejorar ||\n    data.areasMejora ||\n    data.areas_de_mejora ||\n    data.mejoras ||\n    data.recomendaciones ||\n    'No se identificaron aspectos especificos a mejorar.',\n\n  retroalimentacion:\n    data.retroalimentacion ||\n    data.Retroalimentacion ||\n    data.Retroalimentación ||\n    data.feedback ||\n    '',\n\n  courseName: curso,\n  courseSection: data.courseSection || '',\n  teacherFolderId: data.teacherFolderId || '',\n  teacherFolderName: data.teacherFolderName || '',\n\n  reporteTipo: 'retroalimentacion',\n  reporteFileName: `Retroalimentacion - ${estudianteNombre} - ${tarea}`\n    .replace(/[\\\\/:*?\"<>|]/g, '-')\n    .trim(),\n};\n\nreturn {\n  json: output,\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2240,
+        464
+      ],
+      "id": "45f9b69e-5011-4804-9439-132ad917f119",
+      "name": "A. Preparar Reporte de Retroalimentación"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const d = $json;\n\nconst safe = (v) => String(v ?? '').replace(/[&<>\"']/g, c => ({\n  '&': '&amp;',\n  '<': '&lt;',\n  '>': '&gt;',\n  '\"': '&quot;',\n  \"'\": '&#39;',\n}[c]));\n\nconst html = `\n<!DOCTYPE html>\n<html>\n<head>\n<meta charset=\"UTF-8\">\n<style>\n  body {\n    font-family: Arial, sans-serif;\n    padding: 35px;\n    color: #000;\n  }\n\n  .header {\n    text-align: center;\n  }\n\n  .logo {\n    width: 95px;\n    height: 95px;\n    object-fit: contain;\n    margin-bottom: 10px;\n  }\n\n  h1 {\n    font-size: 22px;\n    margin: 0 0 25px;\n  }\n\n  h2 {\n    font-size: 21px;\n    text-decoration: underline;\n    margin-bottom: 40px;\n  }\n\n  .info-grid {\n    display: grid;\n    grid-template-columns: 1fr 1fr;\n    gap: 26px 80px;\n    margin-bottom: 35px;\n  }\n\n  .label {\n    background: #13a8f5;\n    padding: 6px 8px;\n    border-radius: 8px;\n    font-weight: bold;\n    display: inline-block;\n  }\n\n  .grade-row {\n    display: flex;\n    align-items: center;\n    background: #13a8f5;\n    height: 35px;\n    margin: 30px 0 50px;\n  }\n\n  .grade-label {\n    font-weight: bold;\n    margin-left: 35px;\n  }\n\n  .grade-box {\n    margin-left: 35px;\n    background: #62c6f4;\n    border: 3px solid #000;\n    border-radius: 10px;\n    padding: 10px 18px;\n    font-size: 42px;\n    font-weight: bold;\n  }\n\n  .section {\n    margin-top: 48px;\n  }\n\n  .section-title {\n    font-weight: bold;\n    font-size: 16px;\n  }\n\n  .line {\n    border-bottom: 3px solid #13a8f5;\n    margin-top: 6px;\n    min-height: 75px;\n    white-space: pre-wrap;\n  }\n</style>\n</head>\n<body>\n  <div class=\"header\">\n  <img class=\"logo\" src=\"https://drive.google.com/thumbnail?id=1IHweWB163bYo7d5W2xKAhbbclBE1bPkU&sz=w300\">\n  <h1>Centro En artes Celeste Aida del Villar</h1>\n  <h2>Reporte de Retroalimentación</h2>\n</div>\n\n  <div class=\"info-grid\">\n    <div><span class=\"label\">Estudiante</span>: ${safe(d.estudianteNombre)}</div>\n    <div><span class=\"label\">Curso</span>: ${safe(d.curso)}</div>\n    <div><span class=\"label\">Tarea</span>: ${safe(d.tarea)}</div>\n    <div><span class=\"label\">Materia</span>: ${safe(d.materia)}</div>\n    <div><span class=\"label\">Docente</span>: ${safe(d.docente)}</div>\n  </div>\n\n  <div class=\"grade-row\">\n    <div class=\"grade-label\">Calificación :</div>\n    <div class=\"grade-box\">${safe(d.calificacion)}</div>\n  </div>\n\n  <div class=\"section\">\n    <div class=\"section-title\">Fortalezas:</div>\n    <div class=\"line\">${safe(d.fortalezas)}</div>\n  </div>\n\n  <div class=\"section\">\n    <div class=\"section-title\">Aspectos a Mejorar:</div>\n    <div class=\"line\">${safe(d.aspectosMejorar)}</div>\n  </div>\n\n  <div class=\"section\">\n    <div class=\"section-title\">Retroalimentación:</div>\n    <div class=\"line\">${safe(d.retroalimentacion)}</div>\n  </div>\n</body>\n</html>\n`;\n\nreturn {\n  json: {\n    ...d,\n    teacherFolderId: d.teacherFolderId,\n    teacherFolderName: d.teacherFolderName,\n    estudianteNombre: d.estudianteNombre,\n    reporteFileName: d.reporteFileName,\n    html,\n    fileName: `${d.reporteFileName}.html`\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2304,
+        800
+      ],
+      "id": "a27e7df0-abc4-4cf5-b04c-bc2e71ca8816",
+      "name": "B. Crear HTML Reporte Retroalimentación"
+    },
+    {
+      "parameters": {
+        "resource": "fileFolder",
+        "queryString": "={{ $json.estudianteNombre }}",
+        "limit": 1,
+        "filter": {
+          "folderId": {
+            "__rl": true,
+            "value": "={{ $json.teacherFolderId }}",
+            "mode": "id"
+          }
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        2592,
+        560
+      ],
+      "id": "498e7e70-2e4a-47b3-8d35-841f953e3196",
+      "name": "C. Buscar Carpeta Estudiante",
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "9lVIWtbd9ZUWkRNN",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "edd04f55-02a6-430c-9624-4cce24de8d7c",
+              "leftValue": "={{ $json.foundStudentFolderId || '' }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        2880,
+        528
+      ],
+      "id": "c2d56a33-39f6-4219-9023-2e2c213bff6e",
+      "name": "D. If Carpeta Estudiante Existe"
+    },
+    {
+      "parameters": {
+        "resource": "folder",
+        "name": "={{ $('B. Crear HTML Reporte Retroalimentación').first().json.estudianteNombre }}",
+        "driveId": {
+          "__rl": true,
+          "value": "={{ $('B. Crear HTML Reporte Retroalimentación').first().json.teacherFolderId }}",
+          "mode": "id"
+        },
+        "folderId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "root",
+          "cachedResultName": "/ (Root folder)"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        2896,
+        784
+      ],
+      "id": "36e93dcf-0655-412b-a481-622fdcea001a",
+      "name": "E. Crear Carpeta Estudiante",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "9lVIWtbd9ZUWkRNN",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\n\nconst carpeta = items.find(item => item.json?.id) || { json: {} };\n\nreturn [\n  {\n    json: {\n      foundStudentFolderId: carpeta.json.id || '',\n      foundStudentFolderName: carpeta.json.name || '',\n      foundStudentFolderExists: Boolean(carpeta.json.id),\n    }\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2640,
+        800
+      ],
+      "id": "e67b5104-4524-4481-9e58-dc3f5d5a4816",
+      "name": "C1. Normalizar Carpeta Encontrada"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const reporte = $('B. Crear HTML Reporte Retroalimentación').first().json;\n\nreturn {\n  json: {\n    ...reporte,\n    studentFolderId: $json.id,\n    studentFolderName: $json.name,\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3056,
+        832
+      ],
+      "id": "01cc9bac-bfdb-40b5-9d0c-093004d6290a",
+      "name": "F. Preparar Carpeta Destino Reporte"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const reporte = $('B. Crear HTML Reporte Retroalimentación').first().json;\n\nreturn {\n  json: {\n    ...reporte,\n    studentFolderId: $json.foundStudentFolderId,\n    studentFolderName: $json.foundStudentFolderName,\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3088,
+        512
+      ],
+      "id": "6d077ea9-40d5-41c0-b333-ce2862514fd6",
+      "name": "F2. Preparar Carpeta Existente Reporte"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const html = $json.html || '';\nconst fileName = `${$json.reporteFileName || 'Reporte Retroalimentacion'}.html`;\n\nreturn {\n  json: {\n    ...$json,\n    fileName,\n  },\n  binary: {\n    data: {\n      data: Buffer.from(html, 'utf8').toString('base64'),\n      fileName,\n      mimeType: 'text/html',\n      fileExtension: 'html',\n    },\n  },\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3264,
+        688
+      ],
+      "id": "5cb71d79-7e67-4f49-9327-9d3eadf12d2b",
+      "name": "G. Convertir HTML a Archivo"
+    },
+    {
+      "parameters": {
+        "name": "={{ $binary.data.fileName }}",
+        "driveId": {
+          "__rl": true,
+          "value": "My Drive",
+          "mode": "list",
+          "cachedResultName": "My Drive",
+          "cachedResultUrl": "https://drive.google.com/drive/my-drive"
+        },
+        "folderId": {
+          "__rl": true,
+          "value": "={{ $json.studentFolderId }}",
+          "mode": "id"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        3408,
+        736
+      ],
+      "id": "c44da33a-b567-4f62-9f6d-922d7327839c",
+      "name": "H. Subir Reporte Retroalimentación a Drive",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "9lVIWtbd9ZUWkRNN",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const courses = $input.first().json.courses ?? [];\n\nreturn courses\n  .filter(course => course.courseState === 'ACTIVE')\n  .map(course => ({\n    json: {\n      platform: 'google_classroom',\n      courseId: course.id,\n      courseName: course.name,\n      courseSection: course.section ?? '',\n      courseState: course.courseState,\n      teacherFolderId: course.teacherFolder?.id ?? null,\n      teacherFolderName: course.teacherFolder?.title ?? null,\n      rawCourse: course,\n    }\n  }));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1920,
+        -144
+      ],
+      "id": "7ff436d6-2c9d-4c4f-ab76-5fdd1f5e0cdf",
+      "name": "2. Separar Cursos"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const data = $json;\n\nconst tituloTarea =\n  data.tituloTarea ||\n  data.assignmentTitle ||\n  data.assignmentName ||\n  data.title ||\n  '';\n\nconst textoBase = `${tituloTarea} ${data.courseName || ''} ${data.materia || ''}`.toLowerCase();\n\nlet area = data.area || data.materia || '';\nlet mencion = data.mencion || 'Para todos';\nlet tipoTarea = data.tipoTarea || '';\nlet grado = data.grado || data.courseSection || data.courseName || 'Todos';\n\nif (!tipoTarea) {\n  if (textoBase.includes('investig')) tipoTarea = 'Investigacion';\n  else if (textoBase.includes('cuestionario')) tipoTarea = 'Cuestionario';\n  else if (textoBase.includes('glosario')) tipoTarea = 'Glosario de terminos';\n  else if (textoBase.includes('ensayo')) tipoTarea = 'Ensayo';\n  else if (textoBase.includes('resumen')) tipoTarea = 'Resumen';\n  else if (textoBase.includes('ejercicio')) tipoTarea = 'Ejercicios';\n  else if (textoBase.includes('proyecto')) tipoTarea = 'Proyecto';\n  else tipoTarea = 'Tarea escrita';\n}\n\nif (!area) {\n  if (textoBase.includes('matemat')) area = 'Matematica';\n  else if (textoBase.includes('lengua')) area = 'Lengua Espanola';\n  else if (textoBase.includes('sociales')) area = 'Ciencias Sociales';\n  else if (textoBase.includes('naturales')) area = 'Ciencias de la Naturaleza';\n  else if (textoBase.includes('ingles')) area = 'Ingles';\n  else if (textoBase.includes('frances')) area = 'Frances';\n  else if (textoBase.includes('arte')) area = 'Artes';\n  else area = 'Para todos';\n}\n\nif (area === 'Artes' && mencion === 'Para todos') {\n  if (textoBase.includes('multimedia')) mencion = 'Arte Multimedia';\n  else if (textoBase.includes('visual')) mencion = 'Artes Visuales';\n  else if (textoBase.includes('cine') || textoBase.includes('fotografia')) mencion = 'Cine y Fotografia';\n  else if (textoBase.includes('danza')) mencion = 'Danza';\n  else if (textoBase.includes('musica')) mencion = 'Musica';\n  else if (textoBase.includes('teatro')) mencion = 'Teatro';\n  else if (textoBase.includes('artesanal') || textoBase.includes('ceramica')) {\n    mencion = 'Creacion y Produccion Artistica Artesanal';\n  }\n}\n\nreturn {\n  json: {\n    ...data,\n    tituloTarea,\n    area,\n    mencion,\n    tipoTarea,\n    grado,\n  },\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1136,
+        720
+      ],
+      "id": "1961d800-ea70-4197-be7e-8a81f7d5173b",
+      "name": "17a. Identificar Datos de Rúbrica"
+    },
+    {
+      "parameters": {
+        "operation": "download",
+        "fileId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "1eokK96W2ubs1Qv4rjuT0vqPfL6f5QBnm"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        1152,
+        944
+      ],
+      "id": "d76705eb-6681-4f63-b897-37096d6775d2",
+      "name": "17b. Descargar Banco de Rúbricas",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "9lVIWtbd9ZUWkRNN",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const entregas = $('17a. Identificar Datos de Rúbrica').all().map(item => item.json);\nconst rubricas = $input.all().map(item => item.json);\n\nfunction normalizar(valor) {\n  return String(valor || '')\n    .toLowerCase()\n    .normalize('NFD')\n    .replace(/[\\u0300-\\u036f]/g, '')\n    .trim();\n}\n\nfunction crearGrupo(entrega) {\n  const profesor =\n    entrega.teacherName ||\n    entrega.docenteNombre ||\n    entrega.teacherFolderName ||\n    'Profesor no identificado';\n\n  const curso =\n    entrega.courseName ||\n    entrega.curso ||\n    entrega.courseSection ||\n    'Curso no identificado';\n\n  const area =\n    entrega.area ||\n    entrega.materia ||\n    'Area no identificada';\n\n  const mencion =\n    entrega.mencion ||\n    'Para todos';\n\n  const tarea =\n    entrega.tituloTarea ||\n    entrega.assignmentTitle ||\n    entrega.assignmentName ||\n    entrega.title ||\n    'Tarea sin nombre';\n\n  return `${profesor} | ${curso} | ${area} | ${mencion} | ${tarea}`\n    .replace(/[\\\\/:*?\"<>|]/g, '-')\n    .trim();\n}\n\nfunction buscarRubrica(entrega) {\n  const area = normalizar(entrega.area);\n  const mencion = normalizar(entrega.mencion);\n  const tipoTarea = normalizar(entrega.tipoTarea);\n  const grado = normalizar(entrega.grado);\n\n  const activa = r => normalizar(r.activa) === 'si';\n\n  let matchTipo = 'exacta';\n\n  let rubrica =\n    rubricas.find(r =>\n      activa(r) &&\n      normalizar(r.area) === area &&\n      normalizar(r.mencion) === mencion &&\n      normalizar(r.tipoTarea) === tipoTarea &&\n      normalizar(r.grado) === grado\n    );\n\n  if (!rubrica) {\n    matchTipo = 'sin_grado';\n    rubrica = rubricas.find(r =>\n      activa(r) &&\n      normalizar(r.area) === area &&\n      normalizar(r.mencion) === mencion &&\n      normalizar(r.tipoTarea) === tipoTarea\n    );\n  }\n\n  if (!rubrica) {\n    matchTipo = 'area_para_todos';\n    rubrica = rubricas.find(r =>\n      activa(r) &&\n      normalizar(r.area) === area &&\n      normalizar(r.mencion) === 'para todos' &&\n      normalizar(r.tipoTarea) === tipoTarea\n    );\n  }\n\n  if (!rubrica) {\n    matchTipo = 'general_tipo_tarea';\n    rubrica = rubricas.find(r =>\n      activa(r) &&\n      normalizar(r.area) === 'para todos' &&\n      normalizar(r.mencion) === 'para todos' &&\n      normalizar(r.tipoTarea) === tipoTarea\n    );\n  }\n\n  if (!rubrica) {\n    matchTipo = 'general_para_todos';\n    rubrica = rubricas.find(r =>\n      activa(r) &&\n      normalizar(r.banco) === 'general para todos'\n    );\n  }\n\n  if (!rubrica) {\n    matchTipo = 'sin_rubrica';\n    rubrica = {\n      rubricaId: 'SIN-RUBRICA',\n      banco: 'Fallback interno',\n      area: entrega.area || '',\n      mencion: entrega.mencion || '',\n      tipoTarea: entrega.tipoTarea || '',\n      grado: entrega.grado || '',\n      rubrica:\n        'No se encontró rúbrica específica. Evaluar cumplimiento de la consigna, calidad del contenido, coherencia, orden, ortografía y puntualidad sobre 60 puntos.',\n    };\n  }\n\n  return { rubrica, matchTipo };\n}\n\nreturn entregas.map(entrega => {\n  const { rubrica, matchTipo } = buscarRubrica(entrega);\n  const grupoEvaluacion = crearGrupo(entrega);\n\n  return {\n    json: {\n      ...entrega,\n\n      grupoEvaluacion,\n      grupoProfesor:\n        entrega.teacherName ||\n        entrega.docenteNombre ||\n        entrega.teacherFolderName ||\n        'Profesor no identificado',\n      grupoCurso:\n        entrega.courseName ||\n        entrega.curso ||\n        entrega.courseSection ||\n        'Curso no identificado',\n      grupoArea: entrega.area || entrega.materia || 'Area no identificada',\n      grupoMencion: entrega.mencion || 'Para todos',\n      grupoTarea:\n        entrega.tituloTarea ||\n        entrega.assignmentTitle ||\n        entrega.assignmentName ||\n        entrega.title ||\n        'Tarea sin nombre',\n\n      rubricaId: rubrica.rubricaId,\n      rubricaSeleccionada: rubrica.rubrica,\n      rubricaMatchTipo: matchTipo,\n    },\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1184,
+        1360
+      ],
+      "id": "4a04d30d-b6f2-4e42-b30a-1b6f813d8c53",
+      "name": "17d. Seleccionar Rúbrica"
+    },
+    {
+      "parameters": {
+        "operation": "xlsx",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1.1,
+      "position": [
+        1168,
+        1152
+      ],
+      "id": "a979fa4e-9f16-4ae5-8e5f-73df8f1bc4d5",
+      "name": "17c. Extract from File"
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "gpt-4.1-mini",
+          "mode": "list",
+          "cachedResultName": "GPT-4.1-MINI"
+        },
+        "responses": {
+          "values": [
+            {
+              "content": "=Actúa como un docente evaluador experto.\n\nDebes generar una prueba de conocimiento basada únicamente en el contenido entregado por el estudiante.\n\nObjetivo:\nVerificar si el estudiante realmente comprende el trabajo que entregó.\n\nDatos:\n- Estudiante: {{$json.estudianteNombre || $json.studentName || $json.nombreEstudiante || ''}}\n- Tarea: {{$json.tituloTarea || $json.assignmentTitle || $json.title || ''}}\n- Área/Materia: {{$json.area || $json.materia || ''}}\n- Tipo de tarea: {{$json.tipoTarea || ''}}\n\nContenido entregado por el estudiante:\n{{$json.textoExtraido || $json.textoEntrega || $json.submissionText || $json.text || ''}}\n\nReglas:\n- Genera exactamente 5 preguntas.\n- Todas deben ser de selección múltiple.\n- Cada pregunta debe tener 4 opciones: A, B, C y D.\n- Solo una opción debe ser correcta.\n- Las preguntas deben basarse en el contenido entregado por este estudiante.\n- Aunque varios estudiantes entreguen la misma tarea, genera una versión única para este estudiante.\n- Varía la redacción, el orden de las preguntas y el orden de las opciones.\n- Mantén dificultad básica a media.\n- No preguntes contenido que no aparezca o no esté relacionado con la entrega.\n- La prueba completa dura 4 minutos.\n- Cada pregunta tiene máximo 45 segundos.\n- Solo hay 1 intento.\n- No escribas explicación fuera del JSON.\n\nResponde únicamente en JSON válido con esta estructura:\n\n{\n  \"pruebaEstado\": \"pendiente\",\n  \"cantidadPreguntas\": 5,\n  \"tiempoTotalSegundos\": 240,\n  \"tiempoPorPreguntaSegundos\": 45,\n  \"intentosPermitidos\": 1,\n  \"preguntas\": [\n    {\n      \"numero\": 1,\n      \"pregunta\": \"\",\n      \"opciones\": {\n        \"A\": \"\",\n        \"B\": \"\",\n        \"C\": \"\",\n        \"D\": \"\"\n      },\n      \"respuestaCorrecta\": \"A\",\n      \"explicacion\": \"\"\n    }\n  ]\n}"
+            }
+          ]
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 2.3,
+      "position": [
+        1728,
+        304
+      ],
+      "id": "201ed43f-7736-4596-b3f0-20e67174d71d",
+      "name": "20a. Generar Prueba de Conocimiento IA",
+      "credentials": {
+        "openAiApi": {
+          "id": "zceXPlYBszVQRMmY",
+          "name": "OpenAI account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const datosBase = $('20. Merge').all().map(item => item.json);\nconst pruebasIA = $input.all().map(item => item.json);\n\nfunction obtenerTextoIA(item) {\n  return (\n    item.output?.[0]?.content?.[0]?.text ||\n    item.content?.[0]?.text ||\n    item.text ||\n    item.output_text ||\n    ''\n  );\n}\n\nfunction limpiarJson(texto) {\n  return String(texto || '')\n    .replace(/```json/g, '')\n    .replace(/```/g, '')\n    .trim();\n}\n\nfunction parsearPrueba(item) {\n  const texto = limpiarJson(obtenerTextoIA(item));\n\n  try {\n    return JSON.parse(texto);\n  } catch (error) {\n    return {\n      pruebaEstado: 'error_generacion',\n      cantidadPreguntas: 0,\n      tiempoTotalSegundos: 240,\n      tiempoPorPreguntaSegundos: 45,\n      intentosPermitidos: 1,\n      preguntas: [],\n      pruebaParseError: true,\n      pruebaTextoOriginal: texto,\n    };\n  }\n}\n\nfunction crearId(prefix = 'quiz') {\n  return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;\n}\n\nreturn datosBase.map((datos, index) => {\n  const prueba = parsearPrueba(pruebasIA[index] || {});\n  const quizId = crearId('quiz');\n\n  const linkCreadoEn = new Date();\n  const linkExpiraEn = new Date(linkCreadoEn.getTime() + 5 * 60 * 1000);\n\n  const appBaseUrl = 'https://TU-APP-WEB.com/prueba';\n  const quizUrl = `${appBaseUrl}/${quizId}`;\n\n  return {\n    json: {\n      ...datos,\n\n      quizId,\n      quizUrl,\n\n      pruebaEstado: 'pendiente',\n      linkCreadoEn: linkCreadoEn.toISOString(),\n      linkExpiraEn: linkExpiraEn.toISOString(),\n      linkExpiresInSeconds: 300,\n\n      pruebaIniciadaEn: null,\n      pruebaFinalizadaEn: null,\n      intentoUsado: false,\n\n      cantidadPreguntas: prueba.cantidadPreguntas || 5,\n      tiempoTotalSegundos: 240,\n      tiempoPorPreguntaSegundos: 45,\n      intentosPermitidos: 1,\n\n      preguntas: prueba.preguntas || [],\n      respuestasCorrectas: (prueba.preguntas || []).map(p => ({\n        numero: p.numero,\n        respuestaCorrecta: p.respuestaCorrecta,\n      })),\n\n      respuestasEstudiante: [],\n      notaPruebaSobre40: null,\n    },\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1792,
+        528
+      ],
+      "id": "32de18f9-1e34-4923-b163-1c845cd33e4e",
+      "name": "20b. Preparar Registro de Prueba"
+    },
+    {
+      "parameters": {
+        "operation": "toJson",
+        "mode": "each",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.convertToFile",
+      "typeVersion": 1.1,
+      "position": [
+        1936,
+        576
+      ],
+      "id": "3d660241-d9f8-4572-b75e-afb227dfb997",
+      "name": "20c. Convertir Prueba a JSON"
+    },
+    {
+      "parameters": {
+        "name": "={{$json.quizId}}.json",
+        "driveId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "My Drive"
+        },
+        "folderId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "root",
+          "cachedResultName": "/ (Root folder)"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        2080,
+        624
+      ],
+      "id": "1613cc7b-f053-4a4c-8499-1aa79ec391b5",
+      "name": "Upload file",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "9lVIWtbd9ZUWkRNN",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "fileFolder",
+        "searchMethod": "query",
+        "queryString": "=name = 'Cursos y Materias' and mimeType = 'application/vnd.google-apps.folder' and trashed = false",
+        "limit": 1,
+        "filter": {},
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        -1888,
+        64
+      ],
+      "id": "91e2075f-8ef1-43b1-9b95-cb3427e1e3b6",
+      "name": "3. Buscar Cursos y Materias",
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "9lVIWtbd9ZUWkRNN",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "6030754c-5a05-4638-94fb-8902888e33cf",
+              "leftValue": "={{$json.id}}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -1856,
+        288
+      ],
+      "id": "31ac2df5-7cf1-4592-b9a9-29f8721547d8",
+      "name": "4. If Cursos y Materias Existe"
+    },
+    {
+      "parameters": {
+        "resource": "folder",
+        "name": "Cursos y Materias",
+        "driveId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "My Drive"
+        },
+        "folderId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "root",
+          "cachedResultName": "/ (Root folder)"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        -1824,
+        496
+      ],
+      "id": "859ebd7a-20c4-46b3-9195-ba12bf7c676c",
+      "name": "5. Crear Cursos y Materias",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "9lVIWtbd9ZUWkRNN",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const cursos = $('2. Separar Cursos').all().map(item => item.json);\n\nlet cursosMateriasFolderId = '';\n\ntry {\n  cursosMateriasFolderId = $('4. If Cursos y Materias Existe').first().json.id || '';\n} catch (e) {}\n\nif (!cursosMateriasFolderId) {\n  try {\n    cursosMateriasFolderId = $('5. Crear Cursos y Materias').first().json.id || '';\n  } catch (e) {}\n}\n\nreturn cursos.map(curso => {\n  const courseName = curso.courseName || curso.rawCourse?.name || '';\n  const courseSection = curso.courseSection || curso.rawCourse?.section || '';\n\n  const cursoMateriaNombre = `${courseName} - ${courseSection}`\n    .replace(/[\\\\/:*?\"<>|]/g, '-')\n    .replace(/\\s+/g, ' ')\n    .trim();\n\n  return {\n    json: {\n      ...curso,\n      cursosMateriasFolderId,\n      cursoMateriaNombre,\n    },\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1568,
+        -400
+      ],
+      "id": "c5c0fcad-69f5-43eb-911f-9aa97202c009",
+      "name": "6. Preparar Carpeta Curso"
+    },
+    {
+      "parameters": {
+        "resource": "fileFolder",
+        "searchMethod": "query",
+        "queryString": "=name = '{{$json.cursoMateriaNombre}}' and mimeType = 'application/vnd.google-apps.folder' and '{{$json.cursosMateriasFolderId}}' in parents and trashed = false",
+        "limit": 1,
+        "filter": {},
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        -1552,
+        -208
+      ],
+      "id": "6c7d5f56-506b-4d11-bcdf-2a64ddb1e426",
+      "name": "7. Buscar Carpeta Curso",
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "9lVIWtbd9ZUWkRNN",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const cursos = $('6. Preparar Carpeta Curso').all().map(i => i.json);\nconst busquedas = $('7. Buscar Carpeta Curso').all().map(i => i.json);\n\nreturn cursos.map((curso, index) => {\n  const encontrada = busquedas[index] || {};\n\n  return {\n    json: {\n      ...curso,\n      cursoFolderId: encontrada.id || '',\n      cursoFolderName: encontrada.name || '',\n    },\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1536,
+        -16
+      ],
+      "id": "18337365-0e5a-4765-84b7-86d170e78394",
+      "name": "8. Unir Curso + Resultado Búsqueda"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "ce16a489-9da3-46df-bad0-6cb513b160b4",
+              "leftValue": "={{$json.cursoFolderId}}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -1504,
+        192
+      ],
+      "id": "86bd4ea2-c6fe-47d7-b71c-40fec64453e6",
+      "name": "9. If Carpeta Curso Existe"
+    },
+    {
+      "parameters": {
+        "resource": "folder",
+        "name": "={{$json.cursoMateriaNombre}}",
+        "driveId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "My Drive"
+        },
+        "folderId": {
+          "__rl": true,
+          "value": "={{$json.cursosMateriasFolderId}}",
+          "mode": "id"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        -1472,
+        448
+      ],
+      "id": "583b0ec6-5185-426f-b788-3e61b27f1251",
+      "name": "10. Crear Carpeta Curso(s)",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "9lVIWtbd9ZUWkRNN",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "return $input.all().map(item => {\n  const data = item.json;\n\n  return {\n    json: {\n      ...data,\n      cursoFolderIdFinal:\n        data.cursoFolderId ||\n        data.id ||\n        '',\n      cursoFolderNameFinal:\n        data.cursoFolderName ||\n        data.name ||\n        data.cursoMateriaNombre ||\n        ''\n    }\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1184,
+        -240
+      ],
+      "id": "4d24146c-ba8f-445d-8ec6-61675091015c",
+      "name": "12. Normalizar Carpeta Curso"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        -1232,
+        -432
+      ],
+      "id": "69f0e783-996e-4bb2-8132-fe9d0f26ea0a",
+      "name": "11. Unificar Carpeta Curso"
+    },
+    {
+      "parameters": {
+        "jsCode": "const cursos = $input.all().map(item => item.json);\n\nconst subcarpetas = [\n  'Banco de Rúbricas',\n  'Calificaciones por Tarea',\n  'Estudiantes',\n];\n\nreturn cursos.flatMap(curso =>\n  subcarpetas.map(nombreSubcarpeta => ({\n    json: {\n      ...curso,\n      nombreSubcarpeta,\n      parentCursoFolderId: curso.cursoFolderIdFinal,\n    },\n  }))\n);"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1136,
+        -16
+      ],
+      "id": "63615405-2eea-4b2e-8b42-4dc8f7d21a6d",
+      "name": "13. Preparar Subcarpetas Curso"
+    },
+    {
+      "parameters": {
+        "resource": "fileFolder",
+        "searchMethod": "query",
+        "queryString": "=name = '{{$json.nombreSubcarpeta}}' and mimeType = 'application/vnd.google-apps.folder' and '{{$json.parentCursoFolderId}}' in parents and trashed = false",
+        "limit": 1,
+        "filter": {},
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        -1104,
+        224
+      ],
+      "id": "3c210891-0778-495c-a077-30c498305ab2",
+      "name": "14. Buscar Subcarpeta Curso",
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "9lVIWtbd9ZUWkRNN",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const subcarpetas = $('13. Preparar Subcarpetas Curso').all().map(i => i.json);\nconst busquedas = $('14. Buscar Subcarpeta Curso').all().map(i => i.json);\n\nreturn subcarpetas.map((sub, index) => {\n  const encontrada = busquedas[index] || {};\n\n  return {\n    json: {\n      ...sub,\n      subcarpetaFolderId: encontrada.id || '',\n      subcarpetaFolderName: encontrada.name || '',\n    },\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1072,
+        400
+      ],
+      "id": "83794f52-03f2-4402-8d27-a4a2dff94134",
+      "name": "15: Unir Subcarpeta + Resultado Búsqueda"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "63b93f8e-744c-4ec9-b246-e03444811fef",
+              "leftValue": "={{$json.subcarpetaFolderId}}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -1024,
+        640
+      ],
+      "id": "18a64551-ce4e-4b0d-adf0-0c638a1b3b22",
+      "name": "16: If Subcarpeta Curso Existe."
+    },
+    {
+      "parameters": {
+        "resource": "folder",
+        "name": "={{$json.nombreSubcarpeta}}",
+        "driveId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "My Drive"
+        },
+        "folderId": {
+          "__rl": true,
+          "value": "={{$json.parentCursoFolderId}}",
+          "mode": "id"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        -1008,
+        880
+      ],
+      "id": "ee7e9e3b-ae87-4774-9f5d-7fe56ccd0937",
+      "name": "17: Crear Subcarpeta Curso",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "9lVIWtbd9ZUWkRNN",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        -720,
+        -384
+      ],
+      "id": "62047129-a3a3-4879-9e7f-561ae7458305",
+      "name": "18. Unificar Subcarpetas Curso."
+    },
+    {
+      "parameters": {
+        "jsCode": "return $input.all().map(item => {\n  const data = item.json;\n\n  return {\n    json: {\n      ...data,\n      subcarpetaFolderIdFinal:\n        data.subcarpetaFolderId ||\n        data.id ||\n        '',\n      subcarpetaFolderNameFinal:\n        data.subcarpetaFolderName ||\n        data.name ||\n        data.nombreSubcarpeta ||\n        '',\n    },\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -576,
+        -336
+      ],
+      "id": "4978005d-b02c-4e7f-ae78-3868cab32576",
+      "name": "19. Normalizar Subcarpetas Curso"
+    }
+  ],
+  "connections": {
+    "1. Listar Cursos Classroom": {
+      "main": [
+        [
+          {
+            "node": "2. Separar Cursos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "3. Listar Tareas Classroom": {
+      "main": [
+        [
+          {
+            "node": "4. Separar Tareas + Añadir Curso",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "4. Separar Tareas + Añadir Curso": {
+      "main": [
+        [
+          {
+            "node": "5. Obtener Entregas Classroom",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "7. Unir Curso + Tarea + Entrega",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "5. Obtener Entregas Classroom": {
+      "main": [
+        [
+          {
+            "node": "6. Separar Entregas",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "6. Separar Entregas": {
+      "main": [
+        [
+          {
+            "node": "7. Unir Curso + Tarea + Entrega",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "7. Unir Curso + Tarea + Entrega": {
+      "main": [
+        [
+          {
+            "node": "8. Preparar Evaluación IA",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "8. Preparar Evaluación IA": {
+      "main": [
+        [
+          {
+            "node": "9. If, Es PDF?",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "15. Unir Texto + Datos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "9. If, Es PDF?": {
+      "main": [
+        [
+          {
+            "node": "10. Descargar Archivo Entregado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "10. Descargar Archivo Entregado": {
+      "main": [
+        [
+          {
+            "node": "11. Detectar Tipo de Archivo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "11. Detectar Tipo de Archivo": {
+      "main": [
+        [
+          {
+            "node": "12. Extraer Texto PDF",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "12. Extraer Texto PDF": {
+      "main": [
+        [
+          {
+            "node": "13. If ¿Texto Suficiente?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "13. If ¿Texto Suficiente?": {
+      "main": [
+        [
+          {
+            "node": "14. Preparar Texto PDF",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "14. Preparar Texto PDF": {
+      "main": [
+        [
+          {
+            "node": "15. Unir Texto + Datos",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "15. Unir Texto + Datos": {
+      "main": [
+        [
+          {
+            "node": "16. Obtener Nombre del Estudiante",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "16. Obtener Nombre del Estudiante": {
+      "main": [
+        [
+          {
+            "node": "17. Preparar Nombre Estudiante",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "17. Preparar Nombre Estudiante": {
+      "main": [
+        [
+          {
+            "node": "20. Merge",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "17a. Identificar Datos de Rúbrica",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "18. Evaluar Trabajo con IA": {
+      "main": [
+        [
+          {
+            "node": "19. Procesar Resultado IA",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "19. Procesar Resultado IA": {
+      "main": [
+        [
+          {
+            "node": "20. Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "20. Merge": {
+      "main": [
+        [
+          {
+            "node": "20a. Generar Prueba de Conocimiento IA",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "21. Agrupar Reporte iDoceo por Tarea": {
+      "main": [
+        [
+          {
+            "node": "22. Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "22. Loop Over Items": {
+      "main": [
+        [],
+        [
+          {
+            "node": "23. Preparar XLSX iDoceo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "23. Preparar XLSX iDoceo": {
+      "main": [
+        [
+          {
+            "node": "24. Convertir a XLSX",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "24. Convertir a XLSX": {
+      "main": [
+        [
+          {
+            "node": "25. Renombrar XLSX iDoceo.",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "25. Renombrar XLSX iDoceo.": {
+      "main": [
+        [
+          {
+            "node": "26. Search files and folders",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "26. Search files and folders": {
+      "main": [
+        [
+          {
+            "node": "27.If, ¿Carpeta Calificaciones de iDoceo Existe?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "28. Create folder: Calificaciones para IDoceo": {
+      "main": [
+        [
+          {
+            "node": "29. Mantiene el Binario",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "29. Mantiene el Binario": {
+      "main": [
+        [
+          {
+            "node": "30. Subir XLSX iDoceo a Drive",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "27.If, ¿Carpeta Calificaciones de iDoceo Existe?": {
+      "main": [
+        [
+          {
+            "node": "29. Mantiene el Binario",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "28. Create folder: Calificaciones para IDoceo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "A. Preparar Reporte de Retroalimentación": {
+      "main": [
+        [
+          {
+            "node": "B. Crear HTML Reporte Retroalimentación",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "B. Crear HTML Reporte Retroalimentación": {
+      "main": [
+        [
+          {
+            "node": "C. Buscar Carpeta Estudiante",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "C. Buscar Carpeta Estudiante": {
+      "main": [
+        [
+          {
+            "node": "C1. Normalizar Carpeta Encontrada",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "D. If Carpeta Estudiante Existe": {
+      "main": [
+        [
+          {
+            "node": "F2. Preparar Carpeta Existente Reporte",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "E. Crear Carpeta Estudiante",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "C1. Normalizar Carpeta Encontrada": {
+      "main": [
+        [
+          {
+            "node": "D. If Carpeta Estudiante Existe",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "E. Crear Carpeta Estudiante": {
+      "main": [
+        [
+          {
+            "node": "F. Preparar Carpeta Destino Reporte",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "F. Preparar Carpeta Destino Reporte": {
+      "main": [
+        [
+          {
+            "node": "G. Convertir HTML a Archivo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "F2. Preparar Carpeta Existente Reporte": {
+      "main": [
+        [
+          {
+            "node": "G. Convertir HTML a Archivo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "G. Convertir HTML a Archivo": {
+      "main": [
+        [
+          {
+            "node": "H. Subir Reporte Retroalimentación a Drive",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "2. Separar Cursos": {
+      "main": [
+        [
+          {
+            "node": "3. Buscar Cursos y Materias",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "17a. Identificar Datos de Rúbrica": {
+      "main": [
+        [
+          {
+            "node": "17b. Descargar Banco de Rúbricas",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "17b. Descargar Banco de Rúbricas": {
+      "main": [
+        [
+          {
+            "node": "17c. Extract from File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "17d. Seleccionar Rúbrica": {
+      "main": [
+        [
+          {
+            "node": "18. Evaluar Trabajo con IA",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "17c. Extract from File": {
+      "main": [
+        [
+          {
+            "node": "17d. Seleccionar Rúbrica",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "20a. Generar Prueba de Conocimiento IA": {
+      "main": [
+        [
+          {
+            "node": "20b. Preparar Registro de Prueba",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "20b. Preparar Registro de Prueba": {
+      "main": [
+        [
+          {
+            "node": "20c. Convertir Prueba a JSON",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "20c. Convertir Prueba a JSON": {
+      "main": [
+        [
+          {
+            "node": "Upload file",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "3. Buscar Cursos y Materias": {
+      "main": [
+        [
+          {
+            "node": "4. If Cursos y Materias Existe",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "4. If Cursos y Materias Existe": {
+      "main": [
+        [
+          {
+            "node": "6. Preparar Carpeta Curso",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "5. Crear Cursos y Materias",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "5. Crear Cursos y Materias": {
+      "main": [
+        [
+          {
+            "node": "6. Preparar Carpeta Curso",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "6. Preparar Carpeta Curso": {
+      "main": [
+        [
+          {
+            "node": "7. Buscar Carpeta Curso",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "7. Buscar Carpeta Curso": {
+      "main": [
+        [
+          {
+            "node": "8. Unir Curso + Resultado Búsqueda",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "8. Unir Curso + Resultado Búsqueda": {
+      "main": [
+        [
+          {
+            "node": "9. If Carpeta Curso Existe",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "9. If Carpeta Curso Existe": {
+      "main": [
+        [
+          {
+            "node": "11. Unificar Carpeta Curso",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "10. Crear Carpeta Curso(s)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "10. Crear Carpeta Curso(s)": {
+      "main": [
+        [
+          {
+            "node": "11. Unificar Carpeta Curso",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "11. Unificar Carpeta Curso": {
+      "main": [
+        [
+          {
+            "node": "12. Normalizar Carpeta Curso",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "12. Normalizar Carpeta Curso": {
+      "main": [
+        [
+          {
+            "node": "13. Preparar Subcarpetas Curso",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "13. Preparar Subcarpetas Curso": {
+      "main": [
+        [
+          {
+            "node": "14. Buscar Subcarpeta Curso",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "14. Buscar Subcarpeta Curso": {
+      "main": [
+        [
+          {
+            "node": "15: Unir Subcarpeta + Resultado Búsqueda",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "15: Unir Subcarpeta + Resultado Búsqueda": {
+      "main": [
+        [
+          {
+            "node": "16: If Subcarpeta Curso Existe.",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "16: If Subcarpeta Curso Existe.": {
+      "main": [
+        [
+          {
+            "node": "18. Unificar Subcarpetas Curso.",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "17: Crear Subcarpeta Curso",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "17: Crear Subcarpeta Curso": {
+      "main": [
+        [
+          {
+            "node": "18. Unificar Subcarpetas Curso.",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "18. Unificar Subcarpetas Curso.": {
+      "main": [
+        [
+          {
+            "node": "19. Normalizar Subcarpetas Curso",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "staticData": null,
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "pinData": {},
+  "versionId": "6bd81ae5-f2fc-4777-bc54-ab6f747960cb",
+  "versionCounter": 333,
+  "triggerCount": 0,
+  "tags": []
+}

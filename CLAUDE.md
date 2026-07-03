@@ -12,7 +12,7 @@ Automatizar el ciclo completo de una tarea escolar: entrega → corrección → 
 
 ## 3. Stack técnico
 
-- **Orquestación:** n8n (self-hosted o cloud — especificar cuál se usa en cada sesión).
+- **Orquestación:** n8n self-hosted local, corriendo en **Docker** (`docker-compose.yml` en la raíz del repo) desde el 2026-07-02. Antes corría instalado directo vía `npm` — se migró a Docker para evitar problemas de permisos/caché de npm y aislar el entorno. Los datos (workflows, credenciales) viven en `~/.n8n`, montado como volumen dentro del contenedor — no se perdió nada en la migración. Levantar con `docker compose up -d` desde la raíz del repo; editor accesible en `http://localhost:5678`.
 - **LLM de corrección/generación:** ChatGPT u otro LLM configurable vía API (diseño agnóstico al proveedor cuando sea posible).
 - **Almacenamiento:** Google Drive u OneDrive (carpeta por estudiante, dentro de cada curso).
 - **Calificaciones:** XLSX (nombre de la tarea + columnas: Nombre completo, Calificación).
@@ -28,7 +28,8 @@ Automatizar el ciclo completo de una tarea escolar: entrega → corrección → 
 
 **Última verificación en Notion: 2026-07-02.**
 
-- **n8n:** el Roadmap Maestro muestra la etapa **"1. Motor de Automatización (MVP)"** en estado **En Proceso** desde 2026-06-18 (fin estimado 2026-08-02), prioridad Alta. Resultado esperado: "Automatizar evaluación, feedback, PDF y calificación". Subtareas completadas: crear carpeta raíz en Drive, buscar carpeta del curso. Pendiente: crear carpeta del estudiante. Esto contradice el estado "apenas etapa inicial" registrado antes en las instrucciones del Proyecto — **pendiente de confirmación del usuario** sobre cuál es el estado real.
+- **Infraestructura:** repo git inicializado (2026-07-02), `CLAUDE.md` en la raíz, Claude Code instalado y funcionando sobre este repo, MCP conectados (Notion, n8n, Supabase). n8n migrado de instalación npm a Docker el mismo día (ver sección 3). Workflow "Flujo 1.4 (Repor. Retroalim.)" exportado y versionado en `n8n-workflows/`.
+- **n8n:** el Roadmap Maestro muestra la etapa **"1. Motor de Automatización (MVP)"** en estado **En Proceso** desde 2026-06-18 (fin estimado 2026-08-02), prioridad Alta. Resultado esperado: "Automatizar evaluación, feedback, PDF y calificación". Según el checklist "Cerrar bien el MVP actual" en Notion: completado (entrega recibida, extracción de Classroom, cálculo del 60% de trabajo entregado); en proceso (separar la nota en dos partes, prueba diagnóstica del 40%, crear carpeta del estudiante en su curso); pendiente (XLSX para IDoceo, carpeta de reporte de calificaciones, reporte de retroalimentación en HTML). Esto contradice el estado "apenas etapa inicial" registrado antes en las instrucciones del Proyecto — el MVP está considerablemente más avanzado de lo que ese documento sugería.
 - **Notion:** estructura ya definida. Página raíz "MIAFlow" → "Gestión del Proyecto" → "Roadmap Maestro" (database), más páginas "N8N", "Flowise/Missi", "Frontend", "DashBoard". Bases relacionadas: "Módulos del Proyecto", "Registro de Sesiones N8N", "Registro de Sesiones Flowise/Missi", "Registro de Sesiones Documental", "Estructura Drive", "Configuración Nodos N8N". No crear páginas/bases nuevas sin revisar esta estructura primero.
 - **Flowise/Missi:** implementado como chatbot/agente. Función específica (qué consultas resuelve, con qué fuentes, si tiene RAG conectado) aún no completamente definida en las instrucciones del proyecto — tratar como componente aparte del flujo de corrección de n8n.
 - **Supabase:** en uso como BD relacional + RAG + auth simultáneamente. No se ha detallado el esquema exacto — preguntar/inspeccionar antes de proponer tablas o políticas RLS.

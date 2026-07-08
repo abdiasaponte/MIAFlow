@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>MIAFlow — Política de Privacidad</title>
+<style>
+  body {
+    font-family: system-ui, -apple-system, sans-serif;
+    max-width: 760px;
+    margin: 40px auto;
+    padding: 0 20px;
+    color: #222;
+    line-height: 1.6;
+  }
+  h1 { font-size: 26px; }
+  h2 { font-size: 19px; margin-top: 36px; }
+  .updated { color: #666; font-size: 14px; margin-bottom: 32px; }
+  footer { margin-top: 48px; font-size: 13px; color: #666; border-top: 1px solid #ddd; padding-top: 16px; }
+  a { color: #1a5fb4; }
+</style>
+</head>
+<body>
+
+<h1>Política de Privacidad de MIAFlow</h1>
+<p class="updated">Última actualización: 8 de julio de 2026</p>
+
+<p>MIAFlow ("nosotros", "la aplicación") es una herramienta de automatización de procesos docentes, operada por Abdías Aponte, persona natural, con domicilio en la República Dominicana. Esta Política de Privacidad explica qué datos recopilamos, cómo los usamos y qué derechos tienes sobre ellos.</p>
+
+<h2>1. Quién puede usar MIAFlow</h2>
+<p>MIAFlow está dirigido a docentes y, de forma indirecta, a los estudiantes cuyos cursos administran esos docentes a través de Google Classroom. El acceso se realiza mediante inicio de sesión con una cuenta de Google.</p>
+
+<h2>2. Qué datos recopilamos</h2>
+<p>MIAFlow está diseñado para conectarse con distintas plataformas de aula virtual; actualmente la integración disponible es con Google Classroom, y está prevista la incorporación de otras plataformas (por ejemplo, Microsoft Teams o Moodle) más adelante. Al iniciar sesión con Google, y según los permisos que autorices, MIAFlow puede acceder a:</p>
+<ul>
+  <li><strong>Datos básicos de tu cuenta de Google:</strong> nombre, dirección de correo electrónico y foto de perfil.</li>
+  <li><strong>Datos de Google Classroom (solo lectura):</strong> lista de tus cursos y del listado de estudiantes inscritos (nombre y correo, si Classroom lo expone), a través de los permisos <code>classroom.courses.readonly</code> y <code>classroom.rosters.readonly</code>. MIAFlow no crea, modifica ni elimina nada en tu Google Classroom.</li>
+  <li><strong>Tokens de acceso OAuth:</strong> un token de acceso y un token de actualización (refresh token) que nos permiten consultar la información de Classroom autorizada sin pedirte que inicies sesión cada vez.</li>
+  <li><strong>Contenido de tareas entregadas por estudiantes:</strong> cuando un docente usa MIAFlow para corregir una tarea, el contenido de esa entrega se procesa para generar una calificación y un reporte de retroalimentación.</li>
+  <li><strong>Datos de asistencia y calificaciones</strong> que el propio docente cargue manualmente desde su plataforma de gestión (IDoceo, Additio u otra).</li>
+</ul>
+
+<h2>3. Cómo usamos estos datos</h2>
+<ul>
+  <li>Para identificarte como docente y mostrarte únicamente la información de tus propios cursos y estudiantes.</li>
+  <li>Para automatizar la corrección de tareas: el contenido entregado por un estudiante puede enviarse a un proveedor de inteligencia artificial (por ejemplo, ChatGPT/OpenAI) con el único fin de generar una calificación y una retroalimentación estructurada. No usamos este contenido para entrenar modelos de terceros.</li>
+  <li>Para generar reportes de calificación (XLSX) y de retroalimentación (HTML), y almacenarlos organizadamente en el servicio de almacenamiento en la nube que conectes (por ejemplo, Google Drive u OneDrive).</li>
+  <li>Para generar reportes periódicos de rendimiento por estudiante, combinando calificaciones, asistencia y retroalimentación acumulada.</li>
+  <li>Para que el asistente conversacional "Missi" pueda responder consultas del docente sobre sus propios estudiantes y cursos.</li>
+</ul>
+
+<h2>4. Dónde se almacenan los datos</h2>
+<p>Los datos se almacenan en Supabase (base de datos con controles de acceso por fila, de forma que cada docente solo puede ver su propia información) y se orquestan mediante flujos automatizados en n8n. Los tokens de acceso a Google se guardan de forma restringida, accesibles únicamente por los procesos automatizados del sistema, no por otros docentes ni por terceros.</p>
+
+<h2>5. Con quién compartimos datos</h2>
+<p>No vendemos ni alquilamos datos personales a terceros. Los datos se comparten únicamente con los proveedores de servicio necesarios para operar MIAFlow (por ejemplo, el proveedor de inteligencia artificial usado para la corrección automatizada, y los servicios de almacenamiento en la nube que el propio docente conecte, como Google Drive).</p>
+
+<h2>6. Tus derechos</h2>
+<p>Puedes solicitar en cualquier momento: acceso a los datos que tenemos sobre ti, corrección de datos inexactos, eliminación de tu cuenta y de los datos asociados, o revocar el acceso de MIAFlow a tu cuenta de Google desde la <a href="https://myaccount.google.com/permissions" target="_blank">configuración de seguridad de tu cuenta de Google</a>.</p>
+<p>Para ejercer cualquiera de estos derechos, escríbenos a <a href="mailto:elcomandoabdias@gmail.com">elcomandoabdias@gmail.com</a>.</p>
+
+<h2>7. Retención de datos</h2>
+<p>Conservamos los datos mientras tu cuenta esté activa y sea necesario para prestar el servicio. Si solicitas la eliminación de tu cuenta, eliminaremos tus datos personales y tokens de acceso, salvo que la ley exija conservar cierta información por más tiempo.</p>
+
+<h2>8. Menores de edad</h2>
+<p>MIAFlow procesa datos de estudiantes (posiblemente menores de edad) únicamente por instrucción y bajo la cuenta autenticada del docente responsable de ese curso, nunca mediante acceso directo del estudiante a la aplicación. El docente y la institución educativa son responsables de contar con el consentimiento o base legal correspondiente conforme a su normativa local.</p>
+
+<h2>9. Cambios a esta política</h2>
+<p>Podemos actualizar esta Política de Privacidad ocasionalmente. Publicaremos cualquier cambio en esta misma página con la fecha de "última actualización" correspondiente.</p>
+
+<h2>10. Contacto</h2>
+<p>Para preguntas sobre esta Política de Privacidad, escribe a <a href="mailto:elcomandoabdias@gmail.com">elcomandoabdias@gmail.com</a>.</p>
+
+<footer>
+  MIAFlow — <a href="./terminos.html">Términos de Servicio</a>
+</footer>
+
+</body>
+</html>
